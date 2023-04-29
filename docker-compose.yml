@@ -1,0 +1,56 @@
+version: '3.9'
+
+networks:
+  headjack-network:
+    driver: bridge
+
+services:
+  headjack-search-service:
+    container_name: headjack-search-service
+    build: .
+    networks:
+      - headjack-network
+    environment:
+      - DOTENV_FILE=.env
+    volumes:
+      - .:/code
+    command: uvicorn headjack_search_service.api.app:app --host 0.0.0.0 --port 16410 --reload
+    ports:
+      - "16410:16410"
+    depends_on:
+      - hss-chromadb
+
+  hss-chromadb:
+    container_name: hss-chromadb
+    build:
+      context: ./docker/chroma
+      dockerfile: Dockerfile
+    volumes:
+      - ./docker/chroma:/chroma
+      - index_data:/index_data
+    command: uvicorn chromadb.app:app --reload --workers 1 --host 0.0.0.0 --port 16411 --log-config log_config.yml
+    environment:
+      - CHROMA_DB_IMPL=duckdb+parquet
+      - PERSIST_DIRECTORY=/index_data
+    ports:
+      - 16411:16411
+    networks:
+      - headjack-network
+
+  index-documents:
+    container_name: index-documents
+    build: .
+    networks:
+      - headjack-network
+    volumes:
+      - .:/code
+    command: python examples/embed.py --dj http://host.docker.internal:8000 --knowledge /code/examples/documents/* --chroma-host hss-chromadb --chroma-port 16411
+    ports:
+      - "16410:16410"
+    depends_on:
+      - hss-chromadb
+    restart: on-failure
+
+volumes:
+  index_data:
+    driver: local

@@ -7,7 +7,9 @@ description = "An open-source Headjack Search Service."
 authors = [
     {name = "Nick Ouellet", email = "nick@ouellet.dev"},
 ]
-dependencies = []
+dependencies = [
+    "chromadb>=0.3.21"
+]
 requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "Apache-2.0"}
