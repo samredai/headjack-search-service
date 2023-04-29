@@ -1,0 +1,17 @@
+[tool.pdm]
+
+[project]
+name = "headjack-search-service"
+version = "0.0.1"
+description = "An open-source Headjack Search Service."
+authors = [
+    {name = "Nick Ouellet", email = "nick@ouellet.dev"},
+]
+dependencies = []
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
