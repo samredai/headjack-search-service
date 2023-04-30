@@ -2,11 +2,11 @@
 Script to load knowledge documents into a vector database
 """
 import argparse
-import re
-from glob import glob
 import logging
-from pathlib import Path
+import re
 import sys
+from glob import glob
+from pathlib import Path
 
 import chromadb
 import requests
@@ -15,27 +15,26 @@ from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 
 logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(funcName)s - %(message)s  ',
-    datefmt='%d-%b-%y %H:%M:%S',
-    level=logging.INFO
+    format="%(asctime)s - %(levelname)s - %(funcName)s - %(message)s  ", datefmt="%d-%b-%y %H:%M:%S", level=logging.INFO
 )
 _logger = logging.getLogger("embed.py")
+
 
 def get_chroma_client(host: str, port: str) -> chromadb.Client:
     """
     Get a chroma client
     """
     _logger.info(f"Getting chroma client for host {host} and port {port}")
-    return chromadb.Client(Settings(
+    return chromadb.Client(
+        Settings(
             chroma_api_impl="rest",
             chroma_server_host=host,
             chroma_server_http_port=port,
-        ),)
+        ),
+    )
 
 
-def window_document(
-    file_name: str, document_text: str, window_size: int = 200, overlap: int = 50
-):
+def window_document(file_name: str, document_text: str, window_size: int = 200, overlap: int = 50):
     """
     Splits a document into overlapping windows of fixed size.
 
@@ -48,10 +47,7 @@ def window_document(
         List[str]: A list of overlapping windows.
     """
     document = re.split(r"\s+", document_text)
-    title = (
-        re.split(r"[._-]+", file_name)
-        + re.split(r"\s+", document_text.split("\n")[0])[:10]
-    )
+    title = re.split(r"[._-]+", file_name) + re.split(r"\s+", document_text.split("\n")[0])[:10]
     windows = []
     start = 0
     end = window_size
@@ -71,9 +67,7 @@ def index_metrics(dj_url: str, client: chromadb.Client):
     _logger.info(f"Indexing DataJunction metrics ({dj_url})")
     metrics_collection = client.get_or_create_collection(
         "metrics",
-        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        ),
+        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2"),
     )
 
     # Get DJ metrics
@@ -111,9 +105,7 @@ def index_knowledge(knowledge_dir: str, client: chromadb.Client):
     _logger.info(f"Indexing knowledge documents ({knowledge_dir})")
     knowledge_collection = client.get_or_create_collection(
         "knowledge",
-        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        ),
+        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2"),
     )
     knowledge_files = glob(knowledge_dir)
     knowledge_doc_texts = {}
@@ -160,7 +152,7 @@ if __name__ == "__main__":
         client.get_collection(name="metrics")
         _logger.info("Skipped embedding metrics data, collection already exists.")
         skipped_metrics = True
-    except Exception:
+    except ValueError:
         index_metrics(dj_url=args.dj, client=client)
         _logger.info("Metrics indexing completed")
 
@@ -168,7 +160,7 @@ if __name__ == "__main__":
         client.get_collection(name="knowledge")
         _logger.info("Skipped embedding knowledge data, collection already exists.")
         skipped_knowledge = True
-    except Exception:
+    except ValueError:
         index_knowledge(knowledge_dir=args.knowledge, client=client)
         _logger.info("Knowledge indexing completed")
 

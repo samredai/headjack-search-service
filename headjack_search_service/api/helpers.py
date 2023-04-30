@@ -4,11 +4,12 @@ Module containing all config related things
 import logging
 
 import chromadb
-from chromadb.config import Settings
 from chromadb.api.models.Collection import Collection
+from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 
 _logger = logging.getLogger(__name__)
+
 
 def get_chroma_client():  # pragma: no cover
     """
@@ -23,6 +24,7 @@ def get_chroma_client():  # pragma: no cover
     )
     return chroma_client
 
+
 def get_collection(client: chromadb.Client, collection: str) -> Collection:
     """
     Get the headjack chroma collection
@@ -30,7 +32,5 @@ def get_collection(client: chromadb.Client, collection: str) -> Collection:
     _logger.info(f"Getting chroma collection {collection}")
     return client.get_or_create_collection(
         collection,
-        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        ),
+        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2"),
     )

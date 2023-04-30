@@ -1,36 +1,91 @@
 """
 Headjack search service
 """
-from enum import Enum
+import asyncio
 import logging
+from enum import Enum
 from typing import List
+from uuid import uuid4
 
 from chromadb.api.local import LocalAPI
-from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect, Request, Response
-from pydantic import BaseModel
-from headjack_search_service.api.helpers import get_chroma_client
-from fastapi.templating import Jinja2Templates
-import asyncio
 from chromadb.utils import embedding_functions
+from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+
+from headjack_search_service.api.helpers import get_chroma_client
+from headjack_search_service.api.models import Utterance
 
 _logger = logging.getLogger(__name__)
+
 
 class COLLECTION_TYPE(str, Enum):
     knowledge = "knowledge"
     metrics = "metrics"
-    
+
+
 app = FastAPI()
 
-@app.get("/healthcheck/")
+
+@app.get("/healthcheck")
+@app.get("/healthcheck/", include_in_schema=False)
 async def health_check(*, chroma_client: LocalAPI = Depends(get_chroma_client)):
+    _logger.info(f"Pinging chroma database...")
     chroma_client.heartbeat()
+    _logger.info(f"Pinging successful")
     return {"status": "OK"}
 
-@app.get("/query/")
+
+@app.get("/query")
+@app.get("/query/", include_in_schema=False)
 async def query(text: str, collection: COLLECTION_TYPE, n: int = 3, *, chroma_client: LocalAPI = Depends(get_chroma_client)):
-    _logger.info(f"Pulling collection for {collection.value}")
-    chroma_collection = chroma_client.get_collection(collection.value, embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        ),)
+    _logger.info(f"Connecting to collection for {collection.value}")
+    chroma_collection = chroma_client.get_collection(
+        collection.value,
+        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2"),
+    )
     results = chroma_collection.query(query_texts=[text], n_results=n)
-    return results  
+    return results
+
+
+@app.post("/session/{session_id}")
+@app.post("/session/{session_id}/", include_in_schema=False)
+async def get_utterances_for_a_session(
+    session_id: str, *, utterances: List[Utterance], chroma_client: LocalAPI = Depends(get_chroma_client)
+):
+    _logger.info(f"Saving utterances for session {session_id}")
+    chroma_collection = chroma_client.get_or_create_collection(
+        "session_history",
+        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2"),
+    )
+
+    documents = []
+    metadatas = []
+    ids = []
+    for utterance in utterances:
+        documents.append(utterance.context)
+        metadatas.append({"session_id": session_id, "timestamp": str(utterance.timestamp), "type": utterance.type.value})
+        ids.append(str(uuid4()))
+    chroma_collection.add(
+        documents=documents,
+        metadatas=metadatas,
+        ids=ids,
+    )
+    return 201
+
+
+@app.get("/session/{session_id}")
+@app.get("/session/{session_id}/", include_in_schema=False)
+async def search_utterances_for_a_session(
+    session_id: str, query: str, n: int = 3, *, chroma_client: LocalAPI = Depends(get_chroma_client)
+):
+    _logger.info(f"Pulling utterances for session {session_id}")
+    chroma_collection = chroma_client.get_collection(
+        "session_history",
+        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2"),
+    )
+    num_elements = chroma_collection.count()
+    results = chroma_collection.query(
+        query_texts=[query], where={"session_id": session_id}, n_results=n if n <= num_elements else num_elements
+    )
+    return results
