@@ -4,7 +4,9 @@ Script to load knowledge documents into a vector database
 import argparse
 import re
 from glob import glob
+import logging
 from pathlib import Path
+import sys
 
 import chromadb
 import requests
@@ -12,28 +14,23 @@ from chromadb.api.models.Collection import Collection
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 
+logging.basicConfig(
+    format='%(asctime)s - %(levelname)s - %(funcName)s - %(message)s  ',
+    datefmt='%d-%b-%y %H:%M:%S',
+    level=logging.INFO
+)
+_logger = logging.getLogger("embed.py")
 
 def get_chroma_client(host: str, port: str) -> chromadb.Client:
     """
     Get a chroma client
     """
+    _logger.info(f"Getting chroma client for host {host} and port {port}")
     return chromadb.Client(Settings(
             chroma_api_impl="rest",
             chroma_server_host=host,
             chroma_server_http_port=port,
         ),)
-
-
-def get_collection(client: chromadb.Client, collection: str) -> Collection:
-    """
-    Get the headjack chroma collection
-    """
-    return client.get_or_create_collection(
-        collection,
-        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        ),
-    )
 
 
 def window_document(
@@ -50,7 +47,6 @@ def window_document(
     Returns:
         List[str]: A list of overlapping windows.
     """
-
     document = re.split(r"\s+", document_text)
     title = (
         re.split(r"[._-]+", file_name)
@@ -68,11 +64,17 @@ def window_document(
     return windows
 
 
-def index_datajunction(dj_url: str, client: chromadb.Client):
+def index_metrics(dj_url: str, client: chromadb.Client):
     """
     Request metrics from a DataJunction server and embed the descriptions into chroma
     """
-    metrics_collection = get_collection(client=client, collection="metrics")
+    _logger.info(f"Indexing DataJunction metrics ({dj_url})")
+    metrics_collection = client.get_or_create_collection(
+        "metrics",
+        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        ),
+    )
 
     # Get DJ metrics
     metrics_list = requests.get(
@@ -82,6 +84,7 @@ def index_datajunction(dj_url: str, client: chromadb.Client):
     metadatas = []
     ids = []
     for metric in metrics_list:
+        _logger.info(f"Indexing metric {metric}")
         m = requests.get(
             f"{dj_url}/metrics/{metric}/",
         ).json()
@@ -105,8 +108,13 @@ def index_knowledge(knowledge_dir: str, client: chromadb.Client):
     """
     Read text documents in a directory and embed the content into chroma
     """
-    knowledge_collection = get_collection(client=client, collection="knowledge")
-
+    _logger.info(f"Indexing knowledge documents ({knowledge_dir})")
+    knowledge_collection = client.get_or_create_collection(
+        "knowledge",
+        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        ),
+    )
     knowledge_files = glob(knowledge_dir)
     knowledge_doc_texts = {}
     for kd in knowledge_files:
@@ -116,6 +124,7 @@ def index_knowledge(knowledge_dir: str, client: chromadb.Client):
     metadatas = []
     ids = []
     for kd, doc in knowledge_doc_texts.items():
+        _logger.info(f"Splitting knowledge document: {kd}")
         for idx, passage in enumerate(window_document(kd, doc)):
             documents.append(passage)
             metadatas.append({"file": kd, "part": idx})
@@ -145,5 +154,26 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     client = get_chroma_client(host=args.chroma_host, port=args.chroma_port)
-    index_datajunction(dj_url=args.dj, client=client)
-    index_knowledge(knowledge_dir=args.knowledge, client=client)
+    skipped_metrics = False
+    skipped_knowledge = False
+    try:
+        client.get_collection(name="metrics")
+        _logger.info("Skipped embedding metrics data, collection already exists.")
+        skipped_metrics = True
+    except Exception:
+        index_metrics(dj_url=args.dj, client=client)
+        _logger.info("Metrics indexing completed")
+
+    try:
+        client.get_collection(name="knowledge")
+        _logger.info("Skipped embedding knowledge data, collection already exists.")
+        skipped_knowledge = True
+    except Exception:
+        index_knowledge(knowledge_dir=args.knowledge, client=client)
+        _logger.info("Knowledge indexing completed")
+
+    if skipped_metrics:
+        sys.exit("`metrics` collection already exists")
+
+    if skipped_knowledge:
+        sys.exit("`knowledge` collection already exists")

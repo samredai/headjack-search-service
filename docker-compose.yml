@@ -28,7 +28,7 @@ services:
     volumes:
       - ./docker/chroma:/chroma
       - index_data:/index_data
-    command: uvicorn chromadb.app:app --reload --workers 1 --host 0.0.0.0 --port 16411 --log-config log_config.yml
+    command: uvicorn chromadb.app:app --workers 1 --host 0.0.0.0 --port 16411 --log-config log_config.yml
     environment:
       - CHROMA_DB_IMPL=duckdb+parquet
       - PERSIST_DIRECTORY=/index_data
@@ -45,8 +45,6 @@ services:
     volumes:
       - .:/code
     command: python examples/embed.py --dj http://host.docker.internal:8000 --knowledge /code/examples/documents/* --chroma-host hss-chromadb --chroma-port 16411
-    ports:
-      - "16410:16410"
     depends_on:
       - hss-chromadb
     restart: on-failure
