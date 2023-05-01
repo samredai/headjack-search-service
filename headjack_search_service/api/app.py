@@ -10,11 +10,10 @@ from uuid import uuid4
 import uvicorn
 
 from chromadb.api import API
-from chromadb.utils import embedding_functions
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
-from headjack_search_service.api.helpers import get_chroma_client
+from headjack_search_service.api.helpers import get_chroma_client, get_embedding_function
 from headjack_search_service.api.models import Utterance, UtteranceType
 
 _logger = logging.getLogger(__name__)
@@ -54,7 +53,7 @@ async def save_utterances_for_a_session(
     _logger.info(f"Saving utterances for session {session_id}")
     chroma_collection = chroma_client.get_or_create_collection(
         "session_history",
-        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2"),
+        embedding_function=get_embedding_function(),
     )
 
     documents = []
@@ -86,7 +85,7 @@ async def search_utterances_for_a_session(
     _logger.info(f"Pulling utterances for session {session_id}")
     chroma_collection = chroma_client.get_or_create_collection(
         "session_history",
-        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2"),
+        embedding_function=get_embedding_function(),
     )
     num_elements = chroma_collection.count()
     try:

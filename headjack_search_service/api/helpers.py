@@ -43,6 +43,10 @@ def get_collection(client: chromadb.Client, collection: str) -> Collection:
     _logger.info(f"Getting chroma collection {collection}")
     return client.get_or_create_collection(collection)
 
-@lru_cache
+@lru_cache(maxsize=1)
+def get_embedding_function():
+    return embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
