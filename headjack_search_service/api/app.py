@@ -4,17 +4,15 @@ Headjack search service
 import asyncio
 import logging
 from enum import Enum
-from typing import List
+from typing import List, Optional
 from uuid import uuid4
 
 from chromadb.api.local import LocalAPI
 from chromadb.utils import embedding_functions
-from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
-from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from fastapi import Depends, FastAPI, HTTPException
 
 from headjack_search_service.api.helpers import get_chroma_client
-from headjack_search_service.api.models import Utterance
+from headjack_search_service.api.models import Utterance, UtteranceType
 
 _logger = logging.getLogger(__name__)
 
@@ -77,15 +75,18 @@ async def get_utterances_for_a_session(
 @app.get("/session/{session_id}")
 @app.get("/session/{session_id}/", include_in_schema=False)
 async def search_utterances_for_a_session(
-    session_id: str, query: str, n: int = 3, *, chroma_client: LocalAPI = Depends(get_chroma_client)
+    session_id: str, query: str, n: int = 3, type_: Optional[UtteranceType] = UtteranceType.user, *, chroma_client: LocalAPI = Depends(get_chroma_client)
 ):
     _logger.info(f"Pulling utterances for session {session_id}")
-    chroma_collection = chroma_client.get_collection(
+    chroma_collection = chroma_client.get_or_create_collection(
         "session_history",
         embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2"),
     )
     num_elements = chroma_collection.count()
-    results = chroma_collection.query(
-        query_texts=[query], where={"session_id": session_id}, n_results=n if n <= num_elements else num_elements
-    )
+    try:
+        results = chroma_collection.query(
+            query_texts=[query], where={"session_id": session_id, "type": type_.value}, n_results=n if n <= num_elements else num_elements
+        )
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
     return results
