@@ -152,7 +152,7 @@ if __name__ == "__main__":
         client.get_collection(name="metrics")
         _logger.info("Skipped embedding metrics data, collection already exists.")
         skipped_metrics = True
-    except ValueError:
+    except Exception:
         index_metrics(dj_url=args.dj, client=client)
         _logger.info("Metrics indexing completed")
 
@@ -160,7 +160,7 @@ if __name__ == "__main__":
         client.get_collection(name="knowledge")
         _logger.info("Skipped embedding knowledge data, collection already exists.")
         skipped_knowledge = True
-    except ValueError:
+    except Exception:
         index_knowledge(knowledge_dir=args.knowledge, client=client)
         _logger.info("Knowledge indexing completed")
 

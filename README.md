@@ -5,7 +5,29 @@ search service specification.
 
 # Getting Started
 
-To get started, clone this repository.
+Install Headjack Search Service.
+```sh
+pip install headjack-search-service
+```
+
+Start the service.
+```sh
+headjack-search-service --host 0.0.0.0 --port 16410
+```
+
+You can configure the service with the following environment variables.
+
+| Environment Variable         | Description                                     | Example            |
+|------------------------------|-------------------------------------------------|--------------------|
+| HSS_CHROMA_API_IMPL          | Chroma API implementation (rest or local)       | rest               |
+| HSS_CHROMA_DB_IMPL           | Chroma DB implementation                        | duckdb+parquet     |
+| HSS_CHROMA_HOST              | Chroma DB Host                                  | 0.0.0.0            |
+| HSS_CHROMA_PORT              | Chroma DB Port                                  | 16411              |
+| HSS_CHROMA_PERSIST_DIRECTORY | The directory to persist data (local mode only) | /chroma/data/index |
+
+# Docker Compose Demo
+
+To use the docker compose demo, clone this repository.
 
 ```sh
 git clone https://github.com/KnowledgeForge/headjack-search-service
