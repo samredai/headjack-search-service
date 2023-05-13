@@ -46,7 +46,7 @@ services:
       - headjack-network
     volumes:
       - .:/code
-    command: python examples/embed.py --dj http://host.docker.internal:8000 --knowledge /code/examples/documents/* --chroma-host hss-chromadb --chroma-port 16411
+    command: python examples/embed.py --dj http://host.docker.internal:8000 --knowledge /code/examples/documents/* --messages /code/examples/messages/* --chroma-host hss-chromadb --chroma-port 16411
     depends_on:
       - hss-chromadb
     restart: on-failure

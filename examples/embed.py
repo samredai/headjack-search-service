@@ -1,6 +1,7 @@
 """
 Script to load knowledge documents into a vector database
 """
+import time
 import argparse
 import logging
 import re
@@ -19,6 +20,9 @@ logging.basicConfig(
 )
 _logger = logging.getLogger("embed.py")
 
+wait_seconds = 20
+_logger.info(f"Sleeping for {wait_seconds} seconds to allow vector database to start up...")
+time.sleep(wait_seconds)
 
 def get_chroma_client(host: str, port: str) -> chromadb.Client:
     """
@@ -129,6 +133,37 @@ def index_knowledge(knowledge_dir: str, client: chromadb.Client):
     )
 
 
+def index_messages(messages_dir: str, client: chromadb.Client):
+    """
+    Read threads of messages in a directory and embed the content into chroma
+    """
+    _logger.info(f"Indexing message documents ({messages_dir})")
+    messages_collection = client.get_or_create_collection(
+        "messages",
+        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2"),
+    )
+    message_files = glob(messages_dir)
+    message_doc_texts = {}
+    for m in message_files:
+        with open(m) as f:
+            message_doc_texts[".".join(Path(m).name.split(".")[:-1])] = f.read()
+    documents = []
+    metadatas = []
+    ids = []
+    for kd, doc in message_doc_texts.items():
+        _logger.info(f"Splitting message document: {kd}")
+        for idx, passage in enumerate(window_document(kd, doc)):
+            documents.append(passage)
+            metadatas.append({"file": kd, "part": idx})
+            ids.append(kd + f"_{idx}")
+
+    messages_collection.add(
+        documents=documents,
+        metadatas=metadatas,
+        ids=ids,
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="HSSLoader",
@@ -140,6 +175,11 @@ if __name__ == "__main__":
         help="A glob pattern matching knowledge text files",
         type=str,
     )
+    parser.add_argument(
+        "--messages",
+        help="A glob pattern matching messages text files",
+        type=str,
+    )
     parser.add_argument("--dj", help="The DataJunction URL", type=str)
     parser.add_argument("--chroma-host", help="The Chroma DB Host", type=str)
     parser.add_argument("--chroma-port", help="The Chroma DB Port", type=str)
@@ -148,6 +188,7 @@ if __name__ == "__main__":
     client = get_chroma_client(host=args.chroma_host, port=args.chroma_port)
     skipped_metrics = False
     skipped_knowledge = False
+    skipped_messages = False
     try:
         client.get_collection(name="metrics")
         _logger.info("Skipped embedding metrics data, collection already exists.")
@@ -163,9 +204,20 @@ if __name__ == "__main__":
     except Exception:
         index_knowledge(knowledge_dir=args.knowledge, client=client)
         _logger.info("Knowledge indexing completed")
+    
+    try:
+        client.get_collection(name="messages")
+        _logger.info("Skipped embedding messages data, collection already exists.")
+        skipped_messages = True
+    except Exception:
+        index_messages(messages_dir=args.messages, client=client)
+        _logger.info("Message indexing completed")
 
     if skipped_metrics:
         sys.exit("`metrics` collection already exists")
 
     if skipped_knowledge:
         sys.exit("`knowledge` collection already exists")
+    
+    if skipped_messages:
+        sys.exit("`messages` collection already exists")

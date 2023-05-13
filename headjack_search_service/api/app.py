@@ -22,6 +22,7 @@ _logger = logging.getLogger(__name__)
 class COLLECTION_TYPE(str, Enum):
     knowledge = "knowledge"
     metrics = "metrics"
+    messages = "messages"
 
 
 app = FastAPI()
