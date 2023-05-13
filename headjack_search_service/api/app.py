@@ -23,6 +23,7 @@ class COLLECTION_TYPE(str, Enum):
     knowledge = "knowledge"
     metrics = "metrics"
     messages = "messages"
+    people = "people"
 
 
 app = FastAPI()

@@ -3,6 +3,7 @@ Script to load knowledge documents into a vector database
 """
 import time
 import argparse
+import json
 import logging
 import re
 import sys
@@ -164,6 +165,33 @@ def index_messages(messages_dir: str, client: chromadb.Client):
     )
 
 
+def index_people(people_file: str, client: chromadb.Client):
+    """
+    Read json file of people information and embed them into chroma
+    """
+    _logger.info(f"Indexing people documents ({people_file})")
+    messages_collection = client.get_or_create_collection(
+        "people",
+        embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2"),
+    )
+    documents = []
+    metadatas = []
+    ids = []
+
+    people = json.load(open(people_file))
+    for e in people:
+        _logger.info(f"Indexing people documents ({e['first_name']} {e['last_name']})")
+        documents.append(e.pop("description"))
+        ids.append(e.pop("id"))
+        metadatas.append(e)
+
+    messages_collection.add(
+        documents=documents,
+        metadatas=metadatas,
+        ids=ids,
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="HSSLoader",
@@ -180,6 +208,11 @@ if __name__ == "__main__":
         help="A glob pattern matching messages text files",
         type=str,
     )
+    parser.add_argument(
+        "--people",
+        help="A path to a json file with people information",
+        type=str,
+    )
     parser.add_argument("--dj", help="The DataJunction URL", type=str)
     parser.add_argument("--chroma-host", help="The Chroma DB Host", type=str)
     parser.add_argument("--chroma-port", help="The Chroma DB Port", type=str)
@@ -189,6 +222,7 @@ if __name__ == "__main__":
     skipped_metrics = False
     skipped_knowledge = False
     skipped_messages = False
+    skipped_people = False
     try:
         client.get_collection(name="metrics")
         _logger.info("Skipped embedding metrics data, collection already exists.")
@@ -213,6 +247,14 @@ if __name__ == "__main__":
         index_messages(messages_dir=args.messages, client=client)
         _logger.info("Message indexing completed")
 
+    try:
+        client.get_collection(name="people")
+        _logger.info("Skipped embedding people data, collection already exists.")
+        skipped_people = True
+    except Exception:
+        index_people(people_file=args.people, client=client)
+        _logger.info("People indexing completed")
+
     if skipped_metrics:
         sys.exit("`metrics` collection already exists")
 
@@ -221,3 +263,6 @@ if __name__ == "__main__":
     
     if skipped_messages:
         sys.exit("`messages` collection already exists")
+
+    if skipped_people:
+        sys.exit("`people` collection already exists")
