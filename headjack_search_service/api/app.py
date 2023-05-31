@@ -43,7 +43,8 @@ async def health_check(*, chroma_client: API = Depends(get_chroma_client)):
 async def query(text: str, collection: COLLECTION_TYPE, n: int = 3, *, chroma_client: API = Depends(get_chroma_client)):
     _logger.info(f"Connecting to collection for {collection.value}")
     chroma_collection = chroma_client.get_collection(collection.value)
-    results = chroma_collection.query(query_texts=[text], n_results=n)
+    num_elements = chroma_collection.count()
+    results = chroma_collection.query(query_texts=[text], n_results=n if n <= num_elements else num_elements)
     return results
 
 
