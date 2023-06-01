@@ -47,6 +47,15 @@ async def query(text: str, collection: COLLECTION_TYPE, n: int = 3, *, chroma_cl
     results = chroma_collection.query(query_texts=[text], n_results=n if n <= num_elements else num_elements)
     return results
 
+@app.get("/count")
+@app.get("/count/", include_in_schema=False)
+async def get_number_of_documents(collection: COLLECTION_TYPE, *, chroma_client: API = Depends(get_chroma_client)) -> JSONResponse:
+    _logger.info(f"Connecting to collection for {collection.value}")
+    chroma_collection = chroma_client.get_collection(collection.value)
+    return {
+        "collection": collection,
+        "count": chroma_collection.count()
+    }
 
 @app.post("/session/{session_id}")
 @app.post("/session/{session_id}/", include_in_schema=False)
