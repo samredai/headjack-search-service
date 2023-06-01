@@ -2,7 +2,6 @@
 Headjack search service
 """
 import argparse
-import asyncio
 import logging
 from enum import Enum
 from typing import List, Optional
@@ -11,6 +10,7 @@ import uvicorn
 
 from chromadb.api import API
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from headjack_search_service.api.helpers import get_chroma_client, get_embedding_function
@@ -18,16 +18,22 @@ from headjack_search_service.api.models import Utterance, UtteranceType
 
 _logger = logging.getLogger(__name__)
 
+origins = ["*"]
+
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class COLLECTION_TYPE(str, Enum):
     knowledge = "knowledge"
     metrics = "metrics"
     messages = "messages"
     people = "people"
-
-
-app = FastAPI()
-
 
 @app.get("/healthcheck")
 @app.get("/healthcheck/", include_in_schema=False)
